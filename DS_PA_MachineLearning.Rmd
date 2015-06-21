@@ -1,0 +1,98 @@
+---
+title: "Practical Machine Learning WriteUp"
+author: "DSU470"
+date: "Sunday, June 21, 2015"
+output: html_document
+---
+
+### Executive Summary
+Six young healthy participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions. 
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+
+- Class A: exactly according to the specification, 
+- Class B: throwing the elbows to the front, 
+- Class C: lifting the dumbbell only halfway,
+- Class D: lowering the dumbbell only halfway
+- Class D: throwing the hips to the front.
+
+Random forest model was used as prediction model. This model proved to be 99% accurate, with OOB error less than 1%. 
+The 20 unknown samples given were succesfully predicted by the prediction model.
+
+### Study design
+In brief, the studie design is as follows:
+
+##### Loading and cleansing data
+- load the data measured and split the data into 2 datasets used for for training and cross validating the prediction model
+- the Trainingset has 70% of the original data, while cross validating data set has 30%
+- 'NA', '', ' ' or '#DIV/0!' values for observed measures are handled as NA-values which are then translated to numeric 99
+- the first 7 columns are removed
+- Near Zero Variance columns/variables are removed, this reduces the amount of data as well as decrease the number of variables
+- the outcome variable 'classe' has been converted to a factor variable
+- we set a seed for reproducibility purposes
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+library(randomForest)
+library(caret)
+library(ggplot2)
+
+## Set seed
+set.seed(2106)
+
+setwd("~/Courses/Coursera/Data Science/Module 8 - Practical Machine Learning/W3/Assessment_WriteUp")
+```
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE}
+## Load data from the trainingset file, Values "NA", ""," " and "#DIV/0!" are regarded as NA-value
+PMLDataSet <- read.csv( file = "pml-training.csv", header=TRUE, sep = ",", dec=".", as.is=TRUE, na.strings = c("NA",""," ","#DIV/0!"))
+PMLTestSet <- read.csv( file = "pml-testing.csv", header=TRUE, sep = ",", dec=".", as.is=TRUE, na.strings = c("NA",""," ","#DIV/0!"))
+
+## Remove columns from data set
+PMLDataSet <- subset(PMLDataSet, select = -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window) )
+
+## Impute numeric values for those row.columns that are regarded as NA-value
+## This will make sure that the measures in these columns will become Near Zero Variance variables
+PMLDataSet[is.na(PMLDataSet)] <- 99
+
+## Then, immediately remove Near Zero Variance variables
+nzv <- nearZeroVar (PMLDataSet)
+PMLDataSet <- PMLDataSet[, -nzv]
+
+# And also, convert $classe to factor variable
+PMLDataSet$classe <- as.factor(PMLDataSet$classe)
+
+## The result is a cleaned dataset which is the source for building the prediction model
+```
+
+##### Prepare training and cross validating dataset for the prediction model
+```{r, echo=TRUE, warning=FALSE,message=FALSE}
+## Subset the data to a training set and testing set based on the 'classe' variable in the data set.
+PMLTrainingSet <- createDataPartition(y=PMLDataSet$classe, p=0.70, list=FALSE)
+trainingSet <- PMLDataSet[PMLTrainingSet,]
+crossValSet <- PMLDataSet[-PMLTrainingSet,]
+```
+
+##### Build the prediction model
+```{r, echo=TRUE, warning=FALSE,message=FALSE}
+## Fit model to predict the classe
+modelFit <- randomForest(classe ~ ., data = trainingSet)
+
+## Output statistics of the fitted model
+modelFit
+```
+From the random forest fitted model we expect an out of sample error rate to be 0.58%. 
+
+```{r, echo=TRUE, warning=FALSE,message=FALSE}
+# crossvalidate the model using the remaining 30% of data
+predictCV <- predict(modelFit, crossValSet)
+confusionMatrix(crossValSet$classe, predictCV)
+```
+
+##### Apply the prediction model to the given testdata
+```{r, echo=TRUE, warning=FALSE,message=FALSE}
+## (and submit results)
+## as.character(predict(modelFit, newdata=PMLTestSet))
+```
+
+##### Apply the prediction model to the given testdata
+We successfully build a prediction model using Random Forrest method based on the measurements taken during the activities. The prediction modal has been applied to the given testdata, all results were predicted correctly. There are some improvements which could be made to the model itself which could further utilise data compression. Current model uses 52 variables to predict the outcome 'classe', but no doubt this could be much less. 
+One could for instance apply some preprocessing to the trainingset and determine the Principal Components which predict the outcome. All in all, good results, but the model could have been better.
